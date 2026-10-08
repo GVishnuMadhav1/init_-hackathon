@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CivicFlow AI - Urban Operations Command Center</title>
+  
+  <!-- Meta SEO -->
+  <meta name="description" content="CivicFlow AI: AI-Powered Urban Service Demand & Autonomous Resource Allocation Platform for Smart City Operations." />
+  
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body class="flex flex-col h-screen overflow-hidden text-slate-100 bg-[#070b14] relative" data-bg-mode="hud">
+
+  <!-- =========================================================================
+       GLOBAL SPATIAL GIS BACKGROUND MAP & TACTICAL RADAR CANVAS
+       ========================================================================= -->
+  <div id="global-map-container" class="fixed inset-0 w-full h-full z-0"></div>
+  <div id="global-map-radar-overlay" class="fixed inset-0 w-full h-full z-[1] pointer-events-none"></div>
+  <div class="radar-sweep-bar"></div>
+  <div id="global-map-backdrop-overlay" class="fixed inset-0 w-full h-full z-[2] pointer-events-none"></div>
+
+  <!-- =========================================================================
+       TOP GLOBAL HEADER / COMMAND BAR
+       ========================================================================= -->
+  <header class="h-16 border-b border-white/10 bg-[#0c1424]/90 backdrop-blur-md px-6 flex items-center justify-between z-30 shrink-0 relative">
+    <!-- Brand Logo & Live Engine Pulse -->
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3 cursor-pointer" onclick="window.civicApp.navigate('dashboard')">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/25 border border-cyan-400/40">
+          <i data-lucide="activity" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-black tracking-tight text-white font-heading">CIVICFLOW <span class="text-cyan-400">AI</span></h1>
+            <span class="text-[10px] bg-cyan-950/80 text-cyan-300 font-mono px-1.5 py-0.5 rounded border border-cyan-500/30">v2.4 CORE</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Urban Service Demand & Resource Allocation</p>
+        </div>
+      </div>
+
+      <div class="hidden lg:flex items-center gap-2 pl-4 border-l border-white/10">
+        <span class="pulse-dot pulse-dot-green"></span>
+        <span class="text-xs font-mono text-emerald-400 font-medium">NEURAL PIPELINE ACTIVE</span>
+        <span class="text-slate-600">•</span>
+        <span id="header-live-clock" class="text-xs font-mono text-slate-400">2026-10-08 | 08:30 UTC</span>
+      </div>
+    </div>
+
+    <!-- Header Actions, Simulation & Role Switcher -->
+    <div class="flex items-center gap-3">
+      <!-- Map Background Controls Dropdown -->
+      <div class="relative group">
+        <button class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 text-xs font-semibold hover:bg-cyan-900/60 transition-all shadow-md">
+          <i data-lucide="map" class="w-4 h-4"></i>
+          <span class="hidden md:inline">Map Background</span>
+          <i data-lucide="chevron-down" class="w-3 h-3"></i>
+        </button>
+        <div class="absolute right-0 top-full mt-1.5 w-64 p-3 rounded-xl bg-[#0c1424]/95 border border-cyan-500/40 backdrop-blur-xl shadow-2xl space-y-2.5 hidden group-hover:block z-50">
+          <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Spatial Backdrop Mode</div>
+          <div class="grid grid-cols-2 gap-1.5 text-xs">
+            <button onclick="window.civicApp.setBgMode('hud')" class="bg-mode-btn p-1.5 rounded bg-slate-800/80 border border-cyan-500/30 text-cyan-300 text-left hover:border-cyan-400" data-mode="hud">
+              🌆 Glass HUD
+            </button>
+            <button onclick="window.civicApp.setBgMode('radar')" class="bg-mode-btn p-1.5 rounded bg-slate-800/80 border border-white/10 text-slate-200 text-left hover:border-cyan-400" data-mode="radar">
+              🛰️ Radar Grid
+            </button>
+            <button onclick="window.civicApp.setBgMode('deck')" class="bg-mode-btn p-1.5 rounded bg-slate-800/80 border border-white/10 text-slate-200 text-left hover:border-cyan-400" data-mode="deck">
+              🗺️ Full Deck
+            </button>
+            <button onclick="window.civicApp.setBgMode('solid')" class="bg-mode-btn p-1.5 rounded bg-slate-800/80 border border-white/10 text-slate-200 text-left hover:border-cyan-400" data-mode="solid">
+              ⬛ Solid Slate
+            </button>
+          </div>
+          <div class="border-t border-white/10 pt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Map Tile Layers</div>
+          <div class="grid grid-cols-2 gap-1.5 text-xs">
+            <button onclick="window.civicMap.setBaseTile('dark')" class="p-1.5 rounded bg-slate-800/80 border border-white/10 hover:border-cyan-400 text-slate-200 text-left">
+              🌑 Dark Matter
+            </button>
+            <button onclick="window.civicMap.setBaseTile('satellite')" class="p-1.5 rounded bg-slate-800/80 border border-white/10 hover:border-cyan-400 text-slate-200 text-left">
+              🛰️ Satellite
+            </button>
+            <button onclick="window.civicMap.setBaseTile('voyager')" class="p-1.5 rounded bg-slate-800/80 border border-white/10 hover:border-cyan-400 text-slate-200 text-left">
+              🧭 Voyager
+            </button>
+            <button onclick="window.civicMap.setBaseTile('osm')" class="p-1.5 rounded bg-slate-800/80 border border-white/10 hover:border-cyan-400 text-slate-200 text-left">
+              🗺️ Standard OSM
+            </button>
+          </div>
+          <div class="border-t border-white/10 pt-2 flex items-center justify-between">
+            <span class="text-xs text-slate-300">Interact with Map</span>
+            <button id="map-interactivity-btn" onclick="window.civicMap.toggleInteractivity()" class="btn-secondary text-[11px] py-1 px-2">
+              <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-400"></i>
+              <span>Lock / Unlock</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hackathon Scenario Trigger Button -->
+      <button onclick="window.civicApp.openModal('modal-scenarios')" class="btn-ai text-xs py-1.5 px-3">
+        <i data-lucide="zap" class="w-4 h-4"></i>
+        <span>⚡ Demo Scenarios</span>
+      </button>
+
+      <!-- New Service Request Trigger -->
+      <button onclick="window.civicApp.openModal('modal-new-request')" class="btn-primary text-xs py-1.5 px-3">
+        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+        <span>Report Issue</span>
+      </button>
+
+      <!-- Role Selector Dropdown -->
+      <div class="flex items-center gap-2 bg-slate-900/80 p-1 rounded-lg border border-white/10">
+        <i data-lucide="shield" class="w-4 h-4 text-cyan-400 ml-1.5"></i>
+        <select id="role-selector" class="bg-transparent text-xs text-slate-200 font-medium border-none outline-none pr-2 cursor-pointer">
+          <option value="gov_admin" class="bg-slate-900 text-slate-100">Gov Admin (Command Center)</option>
+          <option value="citizen" class="bg-slate-900 text-slate-100">Civil Resident (Citizen App)</option>
+        </select>
+      </div>
+
+      <!-- Notifications Bell with counter -->
+      <button onclick="window.civicApp.navigate('notifications')" class="relative p-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-white/5 transition-all">
+        <i data-lucide="bell" class="w-4 h-4 text-slate-300"></i>
+        <span id="header-notif-count" class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-[10px] font-bold flex items-center justify-center text-white hidden">0</span>
+      </button>
+
+      <!-- Quick Login / User Profile Modal Trigger -->
+      <button onclick="window.civicApp.openModal('modal-auth')" class="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg bg-slate-800/40 border border-white/10 hover:border-cyan-500/40 transition-all">
+        <div class="w-7 h-7 rounded-full bg-cyan-600/30 border border-cyan-400/50 flex items-center justify-center text-xs font-bold text-cyan-300">
+          AD
+        </div>
+        <div class="text-left hidden md:block">
+          <div class="text-[11px] font-bold text-slate-200">Admin Control</div>
+          <div class="text-[9px] text-slate-400">Metro Ops HQ</div>
+        </div>
+      </button>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       MAIN BODY CONTAINER: PERSISTENT SIDEBAR + DYNAMIC VIEW
+       ========================================================================= -->
+  <div class="flex flex-1 overflow-hidden">
+    
+    <!-- PERSISTENT SIDEBAR NAVIGATION -->
+    <aside class="w-64 bg-[#0c1424]/95 border-r border-white/10 flex flex-col justify-between p-3 overflow-y-auto shrink-0 z-20">
+      <div class="space-y-1">
+        
+        <div class="px-3 py-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+          Operations Core
+        </div>
+
+        <a href="#" data-view="dashboard" class="nav-item active">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+          <span>Dashboard</span>
+        </a>
+
+        <a href="#" data-view="map" class="nav-item">
+          <i data-lucide="map" class="w-4 h-4"></i>
+          <span>Map View (GIS)</span>
+          <span class="ml-auto pulse-dot pulse-dot-cyan"></span>
+        </a>
+
+        <a href="#" data-view="requests" class="nav-item">
+          <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+          <span>Service Requests</span>
+        </a>
+
+        <a href="#" data-view="resources" class="nav-item admin-only">
+          <i data-lucide="truck" class="w-4 h-4"></i>
+          <span>Resources & Fleet</span>
+        </a>
+
+        <div class="px-3 pt-4 pb-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+          AI & Decision Center
+        </div>
+
+        <a href="#" data-view="ai" class="nav-item admin-only">
+          <i data-lucide="cpu" class="w-4 h-4 text-purple-400"></i>
+          <span>AI Intelligence</span>
+        </a>
+
+        <a href="#" data-view="predictions" class="nav-item admin-only">
+          <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
+          <span>Demand Predictions</span>
+        </a>
+
+        <a href="#" data-view="model_comparison" class="nav-item admin-only">
+          <i data-lucide="scale" class="w-4 h-4 text-amber-400"></i>
+          <span>Model Comparison</span>
+          <span class="ml-auto text-[9px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-500/30">ML</span>
+        </a>
+
+        <a href="#" data-view="allocation" class="nav-item admin-only">
+          <i data-lucide="refresh-cw" class="w-4 h-4 text-cyan-400"></i>
+          <span>AI Resource Allocator</span>
+        </a>
+
+        <div class="px-3 pt-4 pb-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+          Administration
+        </div>
+
+        <a href="#" data-view="departments" class="nav-item admin-only">
+          <i data-lucide="building-2" class="w-4 h-4"></i>
+          <span>Departments</span>
+        </a>
+
+        <a href="#" data-view="analytics" class="nav-item admin-only">
+          <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+          <span>Analytics & SLA</span>
+        </a>
+
+        <a href="#" data-view="notifications" class="nav-item">
+          <i data-lucide="bell-ring" class="w-4 h-4"></i>
+          <span>Notifications</span>
+        </a>
+
+        <a href="#" data-view="reports" class="nav-item admin-only">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          <span>Reports & Export</span>
+        </a>
+
+        <a href="#" data-view="settings" class="nav-item admin-only">
+          <i data-lucide="database" class="w-4 h-4"></i>
+          <span>CSV & Data Ingest</span>
+        </a>
+      </div>
+
+      <!-- Active Mode Pill -->
+      <div class="p-3 rounded-lg bg-slate-900/80 border border-white/10 mt-4">
+        <div class="text-[10px] text-slate-400 uppercase font-semibold mb-1">Active Profile</div>
+        <div id="active-role-badge" class="badge badge-ai w-full justify-start text-[11px]">
+          <span class="pulse-dot pulse-dot-green"></span> Gov Command Center
+        </div>
+      </div>
+    </aside>
+
+    <!-- DYNAMIC MAIN CONTENT VIEWPORT -->
+    <main class="flex-1 overflow-y-auto bg-transparent p-6 relative z-10">
+      
+      <!-- =====================================================================
+           1. VIEW: DASHBOARD (ADAPTIVE: GOV COMMANDER vs CIVIL RESIDENT)
+           ===================================================================== -->
+      <section id="view-dashboard" class="view-panel space-y-6">
+        
+        <!-- ===================================================================
+             A. GOVERNMENT OPERATIONS COMMANDER DASHBOARD SECTION
+             =================================================================== -->
+        <div id="dashboard-gov-admin-section" class="space-y-6">
+          <!-- Welcome Banner & City Status -->
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-5 border-l-4 border-l-cyan-500">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="badge badge-cyan">COMMAND HUB</span>
+                <h2 class="text-xl font-black text-white font-heading">Metropolitan City Operations Intelligence</h2>
+              </div>
+              <p class="text-xs text-slate-300">Live AI telemetry cycle: <strong class="text-slate-100">REPORT → CLASSIFY → PRIORITIZE → MAP → ANALYZE → PREDICT → ALLOCATE → RESOLVE</strong></p>
+            </div>
+            <div class="flex items-center gap-3">
+              <button onclick="window.civicApp.navigate('map')" class="btn-primary text-xs py-2 px-3 shadow-lg shadow-cyan-500/20">
+                <i data-lucide="map-pin" class="w-4 h-4"></i>
+                <span>Live GIS Map Deck</span>
+              </button>
+              <button onclick="window.civicApp.navigate('allocation')" class="btn-ai text-xs py-2 px-3 shadow-lg shadow-purple-500/20">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+                <span>Run AI Optimization</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Live Sector Spatial Quick-Focus HUD Bar -->
+          <div class="glass-panel p-3.5 flex flex-wrap items-center justify-between gap-3 border border-cyan-500/30">
+            <div class="flex items-center gap-2">
+              <span class="pulse-dot pulse-dot-cyan"></span>
+              <span class="text-xs font-bold text-cyan-300 uppercase tracking-wider font-mono">SECTOR RADAR HUD</span>
+              <span class="text-slate-500 text-xs hidden sm:inline">| Fast Camera Jump:</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="window.civicMap.flyToZone('Zone 1')" class="btn-glass text-[11px] py-1 px-2.5">
+                <span>📍 Zone 1 (Downtown)</span>
+                <span class="badge badge-critical text-[9px] py-0 px-1">4 P1</span>
+              </button>
+              <button onclick="window.civicMap.flyToZone('Zone 2')" class="btn-glass text-[11px] py-1 px-2.5">
+                <span>📍 Zone 2 (Industrial)</span>
+                <span class="badge badge-high text-[9px] py-0 px-1">3 High</span>
+              </button>
+              <button onclick="window.civicMap.flyToZone('Zone 3')" class="btn-glass text-[11px] py-1 px-2.5">
+                <span>📍 Zone 3 (Suburbs)</span>
+                <span class="badge badge-medium text-[9px] py-0 px-1">2 Med</span>
+              </button>
+              <button onclick="window.civicMap.flyToZone('Zone 4')" class="btn-glass text-[11px] py-1 px-2.5">
+                <span>📍 Zone 4 (Commercial)</span>
+                <span class="badge badge-high text-[9px] py-0 px-1">3 High</span>
+              </button>
+              <button onclick="window.civicMap.flyToZone('Zone 5')" class="btn-glass text-[11px] py-1 px-2.5">
+                <span>📍 Zone 5 (Riverfront)</span>
+                <span class="badge badge-critical text-[9px] py-0 px-1">1 Crit</span>
+              </button>
+              <button onclick="window.civicMap.flyToZone('Zone 6')" class="btn-glass text-[11px] py-1 px-2.5">
+                <span>📍 Zone 6 (Residential)</span>
+                <span class="badge badge-low text-[9px] py-0 px-1">2 Low</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Top KPI Cards Grid (8 Cards) -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            
+            <div class="glass-panel p-4 flex flex-col justify-between hover:border-cyan-500/40">
+              <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold">Active Requests</span>
+                <i data-lucide="layers" class="w-4 h-4 text-cyan-400"></i>
+              </div>
+              <div class="text-2xl font-black text-white font-mono" id="kpi-active-reqs">15</div>
+              <div class="text-[11px] text-cyan-400 mt-1 flex items-center gap-1">
+                <span>●</span> Live Telemetry Stream
+              </div>
+            </div>
+
+            <div class="glass-panel p-4 flex flex-col justify-between border-red-500/20 hover:border-red-500/40">
+              <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold">Critical Incidents</span>
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-red-400"></i>
+              </div>
+              <div class="text-2xl font-black text-red-400 font-mono" id="kpi-critical-reqs">4</div>
+              <div class="text-[11px] text-red-300 mt-1 font-semibold">Immediate Dispatch Required</div>
+            </div>
+
+            <div class="glass-panel p-4 flex flex-col justify-between hover:border-amber-500/40">
+              <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold">Pending Triage</span>
+                <i data-lucide="clock" class="w-4 h-4 text-amber-400"></i>
+              </div>
+              <div class="text-2xl font-black text-amber-300 font-mono" id="kpi-pending-reqs">6</div>
+              <div class="text-[11px] text-slate-400 mt-1">Awaiting Field Assignment</div>
+            </div>
+
+            <div class="glass-panel p-4 flex flex-col justify-between hover:border-emerald-500/40">
+              <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold">Resolved Today</span>
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+              </div>
+              <div class="text-2xl font-black text-emerald-400 font-mono" id="kpi-resolved-today">2</div>
+              <div class="text-[11px] text-emerald-400 mt-1">Avg SLA: 3.2 hrs</div>
+            </div>
+
+            <div class="glass-panel p-4 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold">Avg Resolution Time</span>
+                <i data-lucide="timer" class="w-4 h-4 text-cyan-400"></i>
+              </div>
+              <div class="text-2xl font-black text-white font-mono" id="kpi-avg-time">3.8h</div>
+              <div class="text-[11px] text-emerald-400 mt-1">↓ 24% faster than target</div>
+            </div>
+
+            <div class="glass-panel p-4 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold">Available Teams</span>
+                <i data-lucide="users" class="w-4 h-4 text-blue-400"></i>
+              </div>
+              <div class="text-2xl font-black text-slate-100 font-mono" id="kpi-avail-resources">8 / 16</div>
+              <div class="text-[11px] text-slate-400 mt-1">Ready for Immediate Relocation</div>
+            </div>
+
+            <div class="glass-panel p-4 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold">Fleet Utilization</span>
+                <i data-lucide="activity" class="w-4 h-4 text-purple-400"></i>
+              </div>
+              <div class="text-2xl font-black text-purple-300 font-mono" id="kpi-utilization">62%</div>
+              <div class="text-[11px] text-purple-300 mt-1">Optimal Resource Balance</div>
+            </div>
+
+            <div class="glass-panel p-4 flex flex-col justify-between border-indigo-500/30">
+              <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold">Predicted Demand (24h)</span>
+                <i data-lucide="sparkles" class="w-4 h-4 text-indigo-400"></i>
+              </div>
+              <div class="text-2xl font-black text-indigo-300 font-mono" id="kpi-predicted-demand">+29.6%</div>
+              <div class="text-[11px] text-indigo-300 mt-1">LSTM & Prophet Consensus</div>
+            </div>
+          </div>
+
+          <!-- AI Operations Summary Bar -->
+          <div class="glass-panel p-4 border border-purple-500/30">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span class="badge badge-ai">AI STRATEGIC ADVISORY</span>
+                <h3 class="text-sm font-bold text-slate-100">Live Decision Engine & Proactive Resource Recommendations</h3>
+              </div>
+              <span class="text-xs font-mono text-purple-300">Continuous Pipeline Evaluation</span>
+            </div>
+            <div class="space-y-2.5" id="ai-operations-summary-list">
+              <!-- Injected dynamically by app.js -->
+            </div>
+          </div>
+
+          <!-- Charts Grid 1: Trend & Category -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 glass-panel p-5 flex flex-col justify-between">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="font-bold text-sm text-slate-100">Service Request Trend vs Neural Forecast</h3>
+                  <p class="text-xs text-slate-400">Hourly incoming municipal incidents and LSTM prediction</p>
+                </div>
+                <span class="badge badge-cyan text-[10px]">REAL-TIME TELEMETRY</span>
+              </div>
+              <div class="h-64 w-full">
+                <canvas id="chart-request-trend"></canvas>
+              </div>
+            </div>
+
+            <div class="glass-panel p-5 flex flex-col justify-between">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="font-bold text-sm text-slate-100">Category Distribution</h3>
+                  <p class="text-xs text-slate-400">Active requests by domain</p>
+                </div>
+              </div>
+              <div class="h-64 w-full flex items-center justify-center">
+                <canvas id="chart-category-dist"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts Grid 2: Priority & Department Workload -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="glass-panel p-5">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="font-bold text-sm text-slate-100">Incident Severity Breakdown</h3>
+                  <p class="text-xs text-slate-400">Critical / High / Medium / Low distribution</p>
+                </div>
+              </div>
+              <div class="h-56 w-full">
+                <canvas id="chart-priority-dist"></canvas>
+              </div>
+            </div>
+
+            <div class="glass-panel p-5">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="font-bold text-sm text-slate-100">Department Workload vs Fleet Capacity</h3>
+                  <p class="text-xs text-slate-400">Active requests assigned vs available crew count</p>
+                </div>
+              </div>
+              <div class="h-56 w-full">
+                <canvas id="chart-dept-workload"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Incidents Feed -->
+          <div class="glass-panel p-5">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="font-bold text-sm text-slate-100">Recent Municipal Service Incidents</h3>
+                <p class="text-xs text-slate-400">Latest citizen submissions processed and triaged with live deployment status</p>
+              </div>
+              <button onclick="window.civicApp.navigate('requests')" class="btn-secondary text-xs py-1.5 px-3">
+                View All Service Requests →
+              </button>
+            </div>
+            <div class="space-y-2" id="citizen-recent-feed">
+              <!-- Injected dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================================
+             B. CIVIL RESIDENT / CITIZEN PORTAL DASHBOARD SECTION
+             =================================================================== -->
+        <div id="dashboard-citizen-section" class="hidden space-y-6">
+          
+          <!-- Citizen Welcome & Quick Action Card -->
+          <div class="glass-panel p-6 border-l-4 border-l-emerald-500 relative overflow-hidden">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="badge badge-low">CITIZEN ENGAGEMENT DESK</span>
+                  <h2 class="text-xl font-black text-white font-heading">Report Civic Issues & Track Real-Time Resolution</h2>
+                </div>
+                <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                  Submit municipal complaints directly or click on the spatial map behind. Our NLP AI engine instantly categorizes your report, computes priority scores, and routes directly to government field teams.
+                </p>
+              </div>
+              <div class="flex flex-wrap items-center gap-3">
+                <button onclick="window.civicApp.openModal('modal-new-request')" class="btn-primary text-xs py-2.5 px-4 shadow-xl shadow-cyan-500/25">
+                  <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                  <span>Report Problem Now</span>
+                </button>
+                <button onclick="window.civicApp.navigate('map')" class="btn-glass text-xs py-2.5 px-3.5">
+                  <i data-lucide="map-pin" class="w-4 h-4 text-cyan-400"></i>
+                  <span>Click Map to Report</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Fast One-Click Sample Presets Bar -->
+            <div class="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center gap-2">
+              <span class="text-xs font-semibold text-slate-300">⚡ Quick Issue Presets:</span>
+              <button onclick="window.civicApp.openModal('modal-new-request'); window.civicApp.fillSampleIssue('water');" class="btn-glass text-[11px] py-1 px-2.5 hover:border-cyan-400">
+                🌊 Water Main Burst
+              </button>
+              <button onclick="window.civicApp.openModal('modal-new-request'); window.civicApp.fillSampleIssue('pothole');" class="btn-glass text-[11px] py-1 px-2.5 hover:border-amber-400">
+                🚧 Dangerous Potholes
+              </button>
+              <button onclick="window.civicApp.openModal('modal-new-request'); window.civicApp.fillSampleIssue('drain');" class="btn-glass text-[11px] py-1 px-2.5 hover:border-blue-400">
+                🌧️ Clogged Storm Drain
+              </button>
+              <button onclick="window.civicApp.openModal('modal-new-request'); window.civicApp.fillSampleIssue('waste');" class="btn-glass text-[11px] py-1 px-2.5 hover:border-emerald-400">
+                🗑️ Waste Dump Overflow
+              </button>
+              <button onclick="window.civicApp.openModal('modal-new-request'); window.civicApp.fillSampleIssue('light');" class="btn-glass text-[11px] py-1 px-2.5 hover:border-purple-400">
+                💡 Sparking Wire / Blackout
+              </button>
+            </div>
+          </div>
+
+          <!-- Citizen Active Problems with 4-Stage Lifecycle Stepper -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+                <h3 class="font-bold text-base text-slate-100">My Tracked Civic Complaints & Live Field Progress</h3>
+              </div>
+              <span class="text-xs text-slate-400 font-mono">Real-Time Sync with Gov Command</span>
+            </div>
+
+            <div id="citizen-my-requests-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Injected dynamically by app.js renderCitizenPortal -->
+            </div>
+          </div>
+
+          <!-- Community Issues & Upvote Feed -->
+          <div class="glass-panel p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h4 class="font-bold text-sm text-slate-100">Community Reported Issues in Your Sector</h4>
+                <p class="text-xs text-slate-400">Upvote nearby civic problems to increase AI priority dispatch weight</p>
+              </div>
+            </div>
+            <div class="space-y-2" id="citizen-community-feed">
+              <!-- Injected dynamically -->
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- =====================================================================
+           2. VIEW: INTERACTIVE MAP VIEW (GIS COMMAND DECK)
+           ===================================================================== -->
+      <section id="view-map" class="view-panel hidden space-y-4 h-full flex flex-col relative pointer-events-none">
+        
+        <!-- Top Floating GIS Toolbar -->
+        <div class="glass-hud p-4 rounded-xl flex flex-wrap items-center justify-between gap-3 shrink-0 pointer-events-auto shadow-2xl">
+          <div class="flex items-center gap-3">
+            <div class="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-lg shadow-cyan-500/20">
+              <i data-lucide="map" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-base font-bold text-white font-heading">Metropolitan Spatial GIS Command Deck</h2>
+                <span class="badge badge-cyan text-[10px]">LIVE TELEMETRY</span>
+              </div>
+              <p class="text-xs text-slate-400">Real-time incident pins, DBSCAN hotspots, dispatch routes & vehicle tracking</p>
+            </div>
+          </div>
+
+          <!-- Quick Layer & Filter Toggles -->
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Tile Switcher Buttons -->
+            <button onclick="window.civicMap.setBaseTile('dark')" class="btn-secondary text-xs py-1.5 px-2.5">
+              🌑 Dark
+            </button>
+            <button onclick="window.civicMap.setBaseTile('satellite')" class="btn-secondary text-xs py-1.5 px-2.5">
+              🛰️ Satellite
+            </button>
+            <button onclick="window.civicMap.setBaseTile('osm')" class="btn-secondary text-xs py-1.5 px-2.5">
+              🗺️ OSM
+            </button>
+
+            <!-- Category Filter -->
+            <select id="map-filter-cat" onchange="window.civicMap.updateFilters({ category: this.value })" class="bg-slate-900 text-xs text-slate-200 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none">
+              <option value="All">All Categories</option>
+              <option value="Water">Water</option>
+              <option value="Waste">Waste</option>
+              <option value="Roads">Roads</option>
+              <option value="Drainage">Drainage</option>
+              <option value="Streetlights">Streetlights</option>
+              <option value="Infrastructure">Infrastructure</option>
+              <option value="Sanitation">Sanitation</option>
+            </select>
+
+            <!-- Status Filter -->
+            <select id="map-filter-status" onchange="window.civicMap.updateFilters({ status: this.value })" class="bg-slate-900 text-xs text-slate-200 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none">
+              <option value="All">All Statuses</option>
+              <option value="New">New</option>
+              <option value="Assigned">Assigned</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Resolved">Resolved</option>
+            </select>
+
+            <!-- Severity Filter -->
+            <select id="map-filter-sev" onchange="window.civicMap.updateFilters({ severity: this.value })" class="bg-slate-900 text-xs text-slate-200 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none">
+              <option value="All">All Severities</option>
+              <option value="Critical">🔴 Critical Only</option>
+              <option value="High">🟠 High Only</option>
+              <option value="Medium">🟡 Medium Only</option>
+              <option value="Low">🟢 Low Only</option>
+            </select>
+
+            <!-- Zone Fly-To Jump -->
+            <select onchange="if (this.value !== 'All') window.civicMap.flyToZone(this.value)" class="bg-slate-900 text-xs text-cyan-300 border border-cyan-500/40 rounded-lg px-2.5 py-1.5 outline-none font-semibold">
+              <option value="All">📍 Zoom to Zone...</option>
+              <option value="Zone 1">Zone 1 (Downtown)</option>
+              <option value="Zone 2">Zone 2 (Industrial)</option>
+              <option value="Zone 3">Zone 3 (Suburbs)</option>
+              <option value="Zone 4">Zone 4 (Commercial)</option>
+              <option value="Zone 5">Zone 5 (Riverfront)</option>
+              <option value="Zone 6">Zone 6 (Residential)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Floating GIS Workspace Deck (HUD Sidebars & Overlays) -->
+        <div class="flex-1 relative overflow-hidden flex justify-between gap-4 pointer-events-none" style="min-height: 580px;">
+          
+          <!-- Left Floating Quick Incident Ticker -->
+          <div class="w-72 glass-hud rounded-xl p-3 flex flex-col pointer-events-auto overflow-hidden shadow-2xl border border-white/10 shrink-0">
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+              <div class="flex items-center gap-2">
+                <span class="pulse-dot pulse-dot-red"></span>
+                <span class="text-xs font-bold text-slate-100 uppercase tracking-wider">Spatial Tickets</span>
+              </div>
+              <span class="text-[10px] font-mono text-cyan-400">Click to Fly</span>
+            </div>
+            <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="map-gis-incident-list">
+              <!-- Injected dynamically -->
+            </div>
+          </div>
+
+          <!-- Bottom Floating Legend -->
+          <div class="absolute bottom-4 left-80 z-[1000] glass-hud p-3 rounded-xl border border-white/10 text-xs space-y-1.5 shadow-2xl pointer-events-auto">
+            <div class="font-bold text-slate-200 mb-1 border-b border-white/10 pb-1 flex items-center justify-between">
+              <span>GIS Layer Legend</span>
+              <span class="text-[10px] font-mono text-cyan-400">LIVE</span>
+            </div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-red-500 shadow-sm shadow-red-500 animate-pulse"></span> 🔴 Critical Emergency</div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-orange-500"></span> 🟠 High Severity Priority</div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-yellow-500"></span> 🟡 Medium Severity</div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> 🟢 Resolved / Low</div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-cyan-400 animate-pulse"></span> 🚛 Response Units (GPS)</div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-purple-500/60 border border-purple-400"></span> 🟣 DBSCAN Hotspot</div>
+          </div>
+
+          <!-- Bottom Right Floating Telemetry Metrics -->
+          <div class="absolute bottom-4 right-4 z-[1000] glass-hud p-3 rounded-xl border border-white/10 text-xs shadow-2xl pointer-events-auto flex items-center gap-4">
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase">GPS Patrol Stream</div>
+              <div class="text-sm font-black text-cyan-400 font-mono">16 Active Units</div>
+            </div>
+            <div class="border-l border-white/10 pl-3">
+              <div class="text-[10px] text-slate-400 uppercase">Predicted Hotspots</div>
+              <div class="text-sm font-black text-purple-400 font-mono">3 Clustered</div>
+            </div>
+            <div class="border-l border-white/10 pl-3">
+              <div class="text-[10px] text-slate-400 uppercase">Avg Response Time</div>
+              <div class="text-sm font-black text-emerald-400 font-mono">3.8 Hours</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           3. VIEW: SERVICE REQUESTS
+           ===================================================================== -->
+      <section id="view-requests" class="view-panel hidden space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-4">
+          <div>
+            <h2 class="text-lg font-bold text-white">Municipal Service Requests Management</h2>
+            <p class="text-xs text-slate-400">Sentinel-grade incident triage adapted for public civic infrastructure</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <button onclick="window.civicApp.openModal('modal-new-request')" class="btn-primary text-xs py-2 px-3">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>+ Create Service Request</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter & Search Toolbar -->
+        <div class="glass-panel p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div class="lg:col-span-2 relative">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+            <input type="text" id="search-req-input" oninput="window.civicApp.renderRequestsView()" placeholder="Search by ID, keyword, or reporter..." class="w-full bg-slate-900 text-xs text-slate-200 pl-9 pr-3 py-2 rounded-lg border border-white/10 outline-none focus:border-cyan-500" />
+          </div>
+
+          <select id="filter-req-category" onchange="window.civicApp.renderRequestsView()" class="bg-slate-900 text-xs text-slate-200 px-3 py-2 rounded-lg border border-white/10 outline-none">
+            <option value="All">All Categories</option>
+            <option value="Water">Water</option>
+            <option value="Waste">Waste</option>
+            <option value="Roads">Roads</option>
+            <option value="Drainage">Drainage</option>
+            <option value="Streetlights">Streetlights</option>
+            <option value="Infrastructure">Infrastructure</option>
+            <option value="Sanitation">Sanitation</option>
+          </select>
+
+          <select id="filter-req-status" onchange="window.civicApp.renderRequestsView()" class="bg-slate-900 text-xs text-slate-200 px-3 py-2 rounded-lg border border-white/10 outline-none">
+            <option value="All">All Statuses</option>
+            <option value="New">New</option>
+            <option value="Assigned">Assigned</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+          </select>
+
+          <select id="filter-req-zone" onchange="window.civicApp.renderRequestsView()" class="bg-slate-900 text-xs text-slate-200 px-3 py-2 rounded-lg border border-white/10 outline-none">
+            <option value="All">All Zones</option>
+            <option value="Zone 1">Zone 1 (Downtown)</option>
+            <option value="Zone 2">Zone 2 (Industrial)</option>
+            <option value="Zone 3">Zone 3 (Suburbs)</option>
+            <option value="Zone 4">Zone 4 (Commercial)</option>
+            <option value="Zone 5">Zone 5 (Riverfront)</option>
+            <option value="Zone 6">Zone 6 (Residential)</option>
+          </select>
+        </div>
+
+        <!-- Requests Table -->
+        <div class="glass-panel overflow-x-auto">
+          <table class="civic-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Incident Details</th>
+                <th>Category</th>
+                <th>Zone</th>
+                <th>Severity</th>
+                <th>AI Priority Score</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="requests-table-body">
+              <!-- Injected dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           4. VIEW: RESOURCES & FLEET MANAGEMENT
+           ===================================================================== -->
+      <section id="view-resources" class="view-panel hidden space-y-6">
+        <div class="flex items-center justify-between glass-panel p-4">
+          <div>
+            <h2 class="text-lg font-bold text-white">Municipal Fleet & Field Crews Tracking</h2>
+            <p class="text-xs text-slate-400">Live operational status, utilization rates, and specialized machinery</p>
+          </div>
+          <button onclick="window.civicApp.navigate('allocation')" class="btn-ai text-xs py-2 px-3">
+            <i data-lucide="cpu" class="w-4 h-4"></i>
+            <span>AI Fleet Optimizer</span>
+          </button>
+        </div>
+
+        <!-- Field Response Teams Grid -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+            <i data-lucide="users" class="w-4 h-4 text-cyan-400"></i>
+            <span>Field Maintenance Teams (16 Active Units)</span>
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="resources-teams-list">
+            <!-- Injected dynamically -->
+          </div>
+        </div>
+
+        <!-- Vehicles & Specialized Fleet -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+            <i data-lucide="truck" class="w-4 h-4 text-amber-400"></i>
+            <span>Heavy Machinery & Specialized Municipal Vehicles</span>
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="resources-fleet-list">
+            <!-- Injected dynamically -->
+          </div>
+        </div>
+
+        <!-- Specialized Equipment Depot Stock -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+            <i data-lucide="wrench" class="w-4 h-4 text-purple-400"></i>
+            <span>Critical Diagnostic & High-Capacity Equipment Inventory</span>
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="resources-equipment-list">
+            <!-- Injected dynamically -->
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           5. VIEW: AI INTELLIGENCE & DECISION PIPELINE
+           ===================================================================== -->
+      <section id="view-ai" class="view-panel hidden space-y-6">
+        <div class="glass-panel p-5 border-l-4 border-l-purple-500">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="badge badge-ai">CORE COGNITIVE ENGINE</span>
+            <h2 class="text-lg font-black text-white">CivicFlow AI Urban Decision-Making Pipeline</h2>
+          </div>
+          <p class="text-xs text-slate-300">End-to-end transparent decision architecture driving non-emergency urban operations.</p>
+        </div>
+
+        <!-- Decision Pipeline Visual Diagram -->
+        <div class="glass-panel p-6">
+          <h3 class="font-bold text-sm text-slate-100 mb-4 flex items-center gap-2">
+            <i data-lucide="git-branch" class="w-4 h-4 text-purple-400"></i>
+            <span>12-Stage Autonomous Decision Lifecycle</span>
+          </h3>
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
+            
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-purple-300">STAGE 01</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">REPORT RECEIVED</div>
+              <div class="text-[10px] text-slate-400 mt-1">Citizen / Sensor / CSV Ingest</div>
+            </div>
+
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-purple-300">STAGE 02</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">NLP CLASSIFY</div>
+              <div class="text-[10px] text-slate-400 mt-1">Multi-Domain Keyword Extraction</div>
+            </div>
+
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-purple-300">STAGE 03</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">SEVERITY ANALYSIS</div>
+              <div class="text-[10px] text-slate-400 mt-1">Safety & Infrastructure Risk</div>
+            </div>
+
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-purple-300">STAGE 04</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">PRIORITY SCORING</div>
+              <div class="text-[10px] text-slate-400 mt-1">Weighted 0-100 Multi-factor Math</div>
+            </div>
+
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-purple-300">STAGE 05</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">GIS HOTSPOT MAP</div>
+              <div class="text-[10px] text-slate-400 mt-1">DBSCAN Spatial Clustering</div>
+            </div>
+
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-purple-300">STAGE 06</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">ROOT CAUSE MATRIX</div>
+              <div class="text-[10px] text-slate-400 mt-1">Historical Pattern Diagnosis</div>
+            </div>
+
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-cyan-300">STAGE 07</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">DEMAND FORECAST</div>
+              <div class="text-[10px] text-slate-400 mt-1">ARIMA / Prophet / LSTM Time-Series</div>
+            </div>
+
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-cyan-300">STAGE 08</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">RESOURCE SOLVER</div>
+              <div class="text-[10px] text-slate-400 mt-1">Fleet Availability & Gini Imbalance</div>
+            </div>
+
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-cyan-300">STAGE 09</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">AI RECOMMEND</div>
+              <div class="text-[10px] text-slate-400 mt-1">Optimal Relocation Recommendations</div>
+            </div>
+
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-emerald-300">STAGE 10</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">DEPARTMENT DISPATCH</div>
+              <div class="text-[10px] text-slate-400 mt-1">Field Team Direct Assignment</div>
+            </div>
+
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-emerald-300">STAGE 11</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">RESOLUTION & SLA</div>
+              <div class="text-[10px] text-slate-400 mt-1">Verification & Incident Close</div>
+            </div>
+
+            <div class="pipeline-node active-step">
+              <div class="text-[10px] font-mono text-emerald-300">STAGE 12</div>
+              <div class="font-bold text-xs text-slate-100 mt-1">REINFORCEMENT LEARN</div>
+              <div class="text-[10px] text-slate-400 mt-1">Model Weights Auto-Tuned</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hotspot Detection & Root Cause Analysis Matrix -->
+        <div class="glass-panel p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-sm text-slate-100">DBSCAN Spatial Hotspot Clusters & Root Cause Analysis</h3>
+              <p class="text-xs text-slate-400">Automated recurring failure detection across municipal sectors</p>
+            </div>
+            <span class="badge badge-ai">MACHINE LEARNING SPATIAL GROUPING</span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="ai-hotspots-list">
+            <!-- Injected dynamically -->
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           6. VIEW: PREDICTIONS
+           ===================================================================== -->
+      <section id="view-predictions" class="view-panel hidden space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-4">
+          <div>
+            <h2 class="text-lg font-bold text-white">Urban Service Demand Forecasting</h2>
+            <p class="text-xs text-slate-400">Multi-horizon predictive modeling of incoming municipal workloads</p>
+          </div>
+          <!-- Horizon Selector -->
+          <div class="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-lg border border-white/10">
+            <span class="text-xs text-slate-400 pl-2">Forecast Horizon:</span>
+            <button onclick="window.civicApp.setForecastHorizon('24h')" data-horizon="24h" class="horizon-btn px-2.5 py-1 text-xs font-semibold rounded border border-transparent hover:border-white/20">24 Hours</button>
+            <button onclick="window.civicApp.setForecastHorizon('7d')" data-horizon="7d" class="horizon-btn px-2.5 py-1 text-xs font-semibold rounded border border-transparent hover:border-white/20">7 Days</button>
+            <button onclick="window.civicApp.setForecastHorizon('14d')" data-horizon="14d" class="horizon-btn bg-cyan-500/20 border-cyan-500 text-cyan-300 px-2.5 py-1 text-xs font-semibold rounded border">14 Days</button>
+            <button onclick="window.civicApp.setForecastHorizon('30d')" data-horizon="30d" class="horizon-btn px-2.5 py-1 text-xs font-semibold rounded border border-transparent hover:border-white/20">30 Days</button>
+            <button onclick="window.civicApp.setForecastHorizon('90d')" data-horizon="90d" class="horizon-btn px-2.5 py-1 text-xs font-semibold rounded border border-transparent hover:border-white/20">90 Days</button>
+          </div>
+        </div>
+
+        <!-- Predictive Forecast Chart -->
+        <div class="glass-panel p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-sm text-slate-100">Actual vs Multi-Model Predictive Projections</h3>
+              <p class="text-xs text-slate-400">Comparing LSTM Neural Network, Facebook Prophet, and ARIMA (2,1,2)</p>
+            </div>
+            <button onclick="window.civicApp.navigate('model_comparison')" class="btn-secondary text-xs py-1.5 px-3">
+              View Formal Model Comparison Metrics →
+            </button>
+          </div>
+          <div class="h-72 w-full">
+            <canvas id="chart-predictions-multi"></canvas>
+          </div>
+        </div>
+
+        <!-- Sector Predicted Demand Breakdown Cards -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-200 mb-3">Predicted Demand & Additional Crew Requirements by Sector</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="predictions-demand-grid">
+            <!-- Injected dynamically -->
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           7. VIEW: MODEL COMPARISON (REQUIRED)
+           ===================================================================== -->
+      <section id="view-model_comparison" class="view-panel hidden space-y-6">
+        <div class="glass-panel p-5 border-l-4 border-l-amber-500">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="badge badge-medium">RIGOROUS BENCHMARKING</span>
+            <h2 class="text-lg font-black text-white">Forecasting Model Comparison & Evaluation Metrics</h2>
+          </div>
+          <p class="text-xs text-slate-300">Empirically computed performance metrics across municipal time-series architectures. No hardcoded claims.</p>
+        </div>
+
+        <!-- Model Comparison Table -->
+        <div class="glass-panel overflow-x-auto">
+          <table class="civic-table">
+            <thead>
+              <tr>
+                <th>Model Architecture</th>
+                <th>Algorithm Type</th>
+                <th>MAE</th>
+                <th>RMSE</th>
+                <th>MAPE</th>
+                <th>Accuracy</th>
+                <th>Training Time</th>
+                <th>Inference Latency</th>
+                <th>Operational Strengths</th>
+              </tr>
+            </thead>
+            <tbody id="model-comparison-table-body">
+              <!-- Injected dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Comparison Bar Chart: MAE & RMSE -->
+        <div class="glass-panel p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-sm text-slate-100">Error Metrics Comparison (Lower is Better)</h3>
+              <p class="text-xs text-slate-400">Mean Absolute Error (MAE) and Root Mean Squared Error (RMSE) across models</p>
+            </div>
+          </div>
+          <div class="h-64 w-full">
+            <canvas id="chart-model-metrics"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           8. VIEW: AUTONOMOUS AI RESOURCE ALLOCATION
+           ===================================================================== -->
+      <section id="view-allocation" class="view-panel hidden space-y-6">
+        <div class="glass-panel p-5 border-l-4 border-l-cyan-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="badge badge-cyan">AUTONOMOUS OPTIMIZATION</span>
+                <h2 class="text-lg font-black text-white">AI Resource & Fleet Rebalance Engine</h2>
+              </div>
+              <p class="text-xs text-slate-300">Calculates municipal workload distribution vectors to minimize response times and eliminate team overloads.</p>
+            </div>
+            <button onclick="window.civicStore.saveState()" class="btn-primary text-xs py-2 px-3">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              <span>Recalculate Optimal Solution</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Current Allocation vs AI Optimized Allocation Comparison -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Current Allocation -->
+          <div class="glass-panel p-5 border-slate-700">
+            <div class="flex items-center justify-between mb-4 border-b border-white/10 pb-2">
+              <h3 class="font-bold text-sm text-slate-300">Current Manual Allocation</h3>
+              <span class="badge badge-medium">STATUS QUO</span>
+            </div>
+            <div class="space-y-3 text-xs">
+              <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Average City Response Time:</span> <strong class="text-slate-100 font-mono text-sm" id="alloc-cur-resptime">4.8 Hours</strong></div>
+              <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Workload Imbalance (Gini):</span> <strong class="text-red-400 font-mono text-sm" id="alloc-cur-imbalance">64%</strong></div>
+              <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Critical Incident SLA Coverage:</span> <strong class="text-amber-400 font-mono text-sm" id="alloc-cur-coverage">78%</strong></div>
+              <div class="flex justify-between py-1.5"><span class="text-slate-400">Idle Resource Waste:</span> <strong class="text-slate-300 font-mono text-sm">28%</strong></div>
+            </div>
+          </div>
+
+          <!-- AI Optimized Allocation -->
+          <div class="glass-panel p-5 border-cyan-500/40 bg-cyan-950/10">
+            <div class="flex items-center justify-between mb-4 border-b border-cyan-500/20 pb-2">
+              <h3 class="font-bold text-sm text-cyan-300">AI-Optimized Dynamic Allocation</h3>
+              <span class="badge badge-low">RECOMMENDED STATE</span>
+            </div>
+            <div class="space-y-3 text-xs">
+              <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-300">Projected Response Time:</span> <strong class="text-emerald-400 font-mono text-sm" id="alloc-opt-resptime">2.6 Hours</strong></div>
+              <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-300">Projected Imbalance (Gini):</span> <strong class="text-cyan-300 font-mono text-sm" id="alloc-opt-imbalance">14%</strong></div>
+              <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-300">Critical Incident SLA Coverage:</span> <strong class="text-emerald-400 font-mono text-sm" id="alloc-opt-coverage">98%</strong></div>
+              <div class="flex justify-between py-1.5"><span class="text-slate-300">Net Response Time Reduction:</span> <strong class="text-emerald-400 font-mono text-sm" id="alloc-resptime-gain">-45.8%</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pending Autonomous Recommendations Action Cards -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-200 mb-3">Actionable AI Fleet Relocation Proposals</h3>
+          <div class="space-y-3" id="allocation-recommendations-list">
+            <!-- Injected dynamically with 1-click Accept / Reject buttons -->
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           9. VIEW: DEPARTMENT CENTER
+           ===================================================================== -->
+      <section id="view-departments" class="view-panel hidden space-y-6">
+        <!-- Department Selector Tabs -->
+        <div class="glass-panel p-2 flex flex-wrap gap-2" id="department-tabs-header">
+          <!-- Injected dynamically -->
+        </div>
+
+        <!-- Active Department Dashboard -->
+        <div class="glass-panel p-6 space-y-6">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-4">
+            <div>
+              <h2 class="text-xl font-black text-white" id="dept-name-display">Water Supply & Sewage Board</h2>
+              <p class="text-xs text-slate-400" id="dept-head-display">Department Head: Eng. Marcus Vance | Target SLA: 4.0 Hours</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-xs text-slate-400">Workload Load:</span>
+              <div class="w-36 bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                <div id="dept-workload-bar" class="h-full bg-cyan-400" style="width: 60%"></div>
+              </div>
+              <span id="dept-workload-val" class="text-xs font-mono font-bold text-cyan-300">60%</span>
+            </div>
+          </div>
+
+          <!-- Dept Mini KPIs -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="glass-panel p-3 bg-slate-900/60">
+              <div class="text-xs text-slate-400">Active Requests</div>
+              <div class="text-xl font-bold text-white font-mono" id="dept-active-count">0</div>
+            </div>
+            <div class="glass-panel p-3 bg-slate-900/60">
+              <div class="text-xs text-slate-400">Critical Issues</div>
+              <div class="text-xl font-bold text-red-400 font-mono" id="dept-critical-count">0</div>
+            </div>
+            <div class="glass-panel p-3 bg-slate-900/60">
+              <div class="text-xs text-slate-400">Field Teams Available</div>
+              <div class="text-xl font-bold text-emerald-400 font-mono" id="dept-teams-count">0</div>
+            </div>
+            <div class="glass-panel p-3 bg-slate-900/60">
+              <div class="text-xs text-slate-400">Avg Resolution Time</div>
+              <div class="text-xl font-bold text-cyan-300 font-mono" id="dept-avg-res">0h</div>
+            </div>
+          </div>
+
+          <!-- Department Requests List -->
+          <div>
+            <h3 class="font-bold text-sm text-slate-100 mb-3">Department Incident Queue</h3>
+            <div class="overflow-x-auto">
+              <table class="civic-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Incident</th>
+                    <th>Zone</th>
+                    <th>Severity</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="dept-requests-table-body">
+                  <!-- Injected dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           10. VIEW: ANALYTICS & SLA
+           ===================================================================== -->
+      <section id="view-analytics" class="view-panel hidden space-y-6">
+        <div class="glass-panel p-5">
+          <h2 class="text-lg font-bold text-white mb-1">Citywide Municipal Operations Analytics</h2>
+          <p class="text-xs text-slate-400">Multi-dimensional analysis across geographic density, temporal cycles, and SLA compliance</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="glass-panel p-5">
+            <h3 class="font-bold text-sm text-slate-100 mb-3">Geographic Density by Zone</h3>
+            <div class="h-60 w-full">
+              <canvas id="chart-analytics-geo"></canvas>
+            </div>
+          </div>
+
+          <div class="glass-panel p-5">
+            <h3 class="font-bold text-sm text-slate-100 mb-3">Temporal Weekly Inflow</h3>
+            <div class="h-60 w-full">
+              <canvas id="chart-analytics-temporal"></canvas>
+            </div>
+          </div>
+
+          <div class="glass-panel p-5">
+            <h3 class="font-bold text-sm text-slate-100 mb-3">SLA Compliance by Department</h3>
+            <div class="h-60 w-full">
+              <canvas id="chart-analytics-sla"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           11. VIEW: NOTIFICATIONS
+           ===================================================================== -->
+      <section id="view-notifications" class="view-panel hidden space-y-6">
+        <div class="flex items-center justify-between glass-panel p-4">
+          <div>
+            <h2 class="text-lg font-bold text-white">Command Center Notifications & Event Stream</h2>
+            <p class="text-xs text-slate-400">Critical incidents, predictive threshold alarms, and automated resolution logs</p>
+          </div>
+          <button onclick="window.civicStore.notifications.forEach(n => n.unread = false); window.civicApp.renderNotificationsView(); window.civicApp.updateNotificationBadge();" class="btn-secondary text-xs py-1.5 px-3">
+            Mark All as Read
+          </button>
+        </div>
+
+        <div class="space-y-3" id="notifications-full-list">
+          <!-- Injected dynamically -->
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           12. VIEW: REPORTS & EXPORT
+           ===================================================================== -->
+      <section id="view-reports" class="view-panel hidden space-y-6">
+        <div class="flex items-center justify-between glass-panel p-4 no-print">
+          <div>
+            <h2 class="text-lg font-bold text-white">Executive Municipal Operations Report</h2>
+            <p class="text-xs text-slate-400">Formatted printable overview and downloadable CSV datasets</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <button onclick="window.civicApp.downloadReportCSV()" class="btn-secondary text-xs py-2 px-3">
+              <i data-lucide="download" class="w-4 h-4"></i>
+              <span>Download CSV</span>
+            </button>
+            <button onclick="window.civicApp.printReport()" class="btn-primary text-xs py-2 px-3">
+              <i data-lucide="printer" class="w-4 h-4"></i>
+              <span>Print / PDF Report</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Printable Document Container -->
+        <div class="glass-panel p-8 space-y-6 bg-slate-900/90 border border-white/10" id="printable-report-area">
+          <div class="border-b border-white/15 pb-4 flex justify-between items-start">
+            <div>
+              <h1 class="text-2xl font-black text-white font-heading">CIVICFLOW AI - MUNICIPAL REPORT</h1>
+              <p class="text-xs text-slate-400">City Operations Command Center & AI Intelligence Assessment</p>
+            </div>
+            <div class="text-right text-xs text-slate-400">
+              <div>Report Date: <strong class="text-slate-200" id="rep-gen-date">Today</strong></div>
+              <div>Classification: <strong class="text-cyan-400">OFFICIAL PUBLIC REPORT</strong></div>
+            </div>
+          </div>
+
+          <!-- Summary Metrics -->
+          <div class="grid grid-cols-4 gap-4 p-4 rounded bg-slate-950/60 border border-white/5 text-center">
+            <div>
+              <div class="text-xs text-slate-400">Total Tracked Incidents</div>
+              <div class="text-xl font-bold text-white font-mono" id="rep-total-reqs">15</div>
+            </div>
+            <div>
+              <div class="text-xs text-slate-400">Critical Incidents</div>
+              <div class="text-xl font-bold text-red-400 font-mono" id="rep-crit-reqs">4</div>
+            </div>
+            <div>
+              <div class="text-xs text-slate-400">Resolved Cases</div>
+              <div class="text-xl font-bold text-emerald-400 font-mono" id="rep-resolved-reqs">2</div>
+            </div>
+            <div>
+              <div class="text-xs text-slate-400">SLA Compliance Rate</div>
+              <div class="text-xl font-bold text-cyan-300 font-mono" id="rep-sla-rate">91.4%</div>
+            </div>
+          </div>
+
+          <!-- Breakdown by Department -->
+          <div>
+            <h3 class="font-bold text-sm text-slate-200 mb-2">Department Performance & Workload Breakdown</h3>
+            <table class="civic-table text-xs">
+              <thead>
+                <tr>
+                  <th>Department</th>
+                  <th>Total Requests</th>
+                  <th>Active Cases</th>
+                  <th>Resolved</th>
+                  <th>Avg Resolution</th>
+                  <th>Workload Index</th>
+                </tr>
+              </thead>
+              <tbody id="rep-dept-breakdown-body">
+                <!-- Injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           13. VIEW: CSV & DATA INGESTION SETTINGS
+           ===================================================================== -->
+      <section id="view-settings" class="view-panel hidden space-y-6">
+        <div class="glass-panel p-5">
+          <h2 class="text-lg font-bold text-white mb-1">Municipal CSV Data Ingestion & Settings</h2>
+          <p class="text-xs text-slate-400">Upload historical municipal records or connect external data feeds</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="glass-panel p-5 space-y-4">
+            <h3 class="font-bold text-sm text-slate-100 flex items-center gap-2">
+              <i data-lucide="upload" class="w-4 h-4 text-cyan-400"></i>
+              <span>Upload Municipal CSV File</span>
+            </h3>
+            <p class="text-xs text-slate-300">
+              Upload municipal service CSV datasets. CivicFlow AI validates columns, geocodes coordinates, executes NLP classification, and immediately refreshes GIS maps and ML forecasts.
+            </p>
+            <div class="p-4 border-2 border-dashed border-white/20 rounded-xl text-center hover:border-cyan-500 transition-all cursor-pointer">
+              <input type="file" id="csv-upload-input" accept=".csv" class="hidden" />
+              <label for="csv-upload-input" class="cursor-pointer block space-y-2">
+                <i data-lucide="file-spreadsheet" class="w-8 h-8 text-cyan-400 mx-auto"></i>
+                <div class="text-xs font-semibold text-slate-200">Click to Select or Drag .CSV File</div>
+                <div class="text-[11px] text-slate-400">Supports columns: request_id, category, description, latitude, longitude, zone, severity, status...</div>
+              </label>
+            </div>
+            <div class="flex justify-between items-center pt-2">
+              <button onclick="window.civicApp.downloadReportCSV()" class="text-xs text-cyan-400 hover:underline">
+                Download Sample Municipal Template CSV
+              </button>
+            </div>
+          </div>
+
+          <div class="glass-panel p-5 space-y-4">
+            <h3 class="font-bold text-sm text-slate-100 flex items-center gap-2">
+              <i data-lucide="rotate-ccw" class="w-4 h-4 text-red-400"></i>
+              <span>Data Reset & Defaults</span>
+            </h3>
+            <p class="text-xs text-slate-300">
+              Reset the centralized urban database back to realistic initial municipal seed state (clears simulation overrides).
+            </p>
+            <button onclick="if(confirm('Reset all civic data back to seed state?')) { window.civicStore.resetToDefaultData(); window.civicApp.showToast('Reset completed!', 'info'); }" class="btn-danger text-xs py-2 px-4">
+              Reset Central Store to Default
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- =========================================================================
+       SLIDE-OVER INCIDENT INTELLIGENCE DRAWER (AI + TEAM DEPLOYMENT + PROGRESS)
+       ========================================================================= -->
+  <div id="incident-drawer" class="drawer-panel">
+    <!-- Drawer Header -->
+    <div class="p-4 border-b border-white/10 flex items-center justify-between bg-[#0c1424]">
+      <div class="flex items-center gap-2">
+        <span class="font-mono text-cyan-400 font-bold text-sm" id="drawer-req-id">CIV-1001</span>
+        <span class="badge" id="drawer-req-severity">Critical</span>
+      </div>
+      <button id="drawer-close-btn" class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-100">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- Drawer Body -->
+    <div class="p-5 flex-1 overflow-y-auto space-y-4">
+      <div>
+        <h3 class="font-bold text-base text-slate-100 mb-1" id="drawer-req-subcat">Main Pipe Burst</h3>
+        <p class="text-xs text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded border border-white/5" id="drawer-req-desc">
+          Water is continuously gushing from main pipe...
+        </p>
+      </div>
+
+      <!-- Real-Time Resolution Lifecycle Stepper -->
+      <div class="glass-panel p-3.5 border-cyan-500/30 bg-slate-900/80 space-y-2">
+        <div class="flex items-center justify-between text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+          <span>Live Incident Progress Stepper</span>
+          <span class="text-cyan-400 font-mono">Stage 1-4</span>
+        </div>
+        <div id="drawer-lifecycle-stepper">
+          <!-- Injected dynamically by app.js -->
+        </div>
+      </div>
+
+      <!-- AI Cognitive Analysis Card -->
+      <div class="glass-panel p-3.5 border-purple-500/30 bg-purple-950/20 space-y-2">
+        <div class="flex items-center justify-between text-xs">
+          <span class="badge badge-ai">AI COGNITIVE INSIGHT</span>
+          <span class="font-bold text-cyan-300 font-mono">Priority: <span id="drawer-req-priority">94/100</span></span>
+        </div>
+        <p class="text-xs text-slate-200 leading-relaxed" id="drawer-req-ai-notes">
+          NLP detected high-velocity water leakage impacting structural road foundation.
+        </p>
+      </div>
+
+      <!-- Incident Meta Grid -->
+      <div class="grid grid-cols-2 gap-2 text-xs bg-slate-900/60 p-3 rounded border border-white/5">
+        <div><span class="text-slate-500">Category:</span> <strong class="text-slate-200" id="drawer-req-category">Water</strong></div>
+        <div><span class="text-slate-500">Zone:</span> <strong class="text-cyan-400" id="drawer-req-zone">Zone 1</strong></div>
+        <div><span class="text-slate-500">Department:</span> <strong class="text-slate-200" id="drawer-req-dept">Water Management</strong></div>
+        <div><span class="text-slate-500">Est. Resolution:</span> <strong class="text-amber-400" id="drawer-req-eta">3.5 Hours</strong></div>
+        <div><span class="text-slate-500">Reporter:</span> <span class="text-slate-300" id="drawer-req-reporter">Sarah</span></div>
+        <div><span class="text-slate-500">Impact Support:</span> <strong class="text-cyan-300" id="drawer-req-upvotes">42 Upvotes</strong></div>
+      </div>
+
+      <!-- Field Team Assignment & Crew Deployment Deck -->
+      <div class="glass-panel p-4 space-y-3 border-cyan-500/30">
+        <div class="flex items-center justify-between">
+          <h4 class="font-bold text-xs text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="truck" class="w-4 h-4 text-cyan-400"></i>
+            <span>Field Team & Crew Deployment</span>
+          </h4>
+          <span class="text-[10px] text-cyan-400 font-mono" id="drawer-req-team">Unassigned</span>
+        </div>
+
+        <div id="drawer-team-crew-details">
+          <!-- Injected dynamically with team lead, crew size, skills -->
+        </div>
+        
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">Select Field Response Team:</label>
+          <select id="drawer-team-dispatch-select" class="w-full bg-slate-900 text-xs text-slate-100 p-2 rounded border border-white/10 outline-none">
+            <!-- Injected dynamically -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">Update Lifecycle Status:</label>
+          <select id="drawer-status-select" class="w-full bg-slate-900 text-xs text-slate-100 p-2 rounded border border-white/10 outline-none">
+            <option value="New">1. New (Awaiting Dispatch)</option>
+            <option value="Assigned">2. Assigned (Team Mobilized)</option>
+            <option value="In Progress">3. In Progress (Crew on Scene)</option>
+            <option value="Resolved">4. Resolved & Verified</option>
+          </select>
+        </div>
+
+        <!-- Quick Stage Buttons for Gov Admin -->
+        <div class="pt-1 space-y-2">
+          <div class="flex gap-2">
+            <button onclick="window.civicApp.saveDrawerStatus()" class="btn-primary text-xs py-2 px-3 flex-1 justify-center shadow-lg shadow-cyan-500/20">
+              ⚡ Deploy & Save Status
+            </button>
+            <button onclick="window.civicApp.upvoteCurrentRequest()" class="btn-secondary text-xs py-2 px-3">
+              👍 Upvote
+            </button>
+          </div>
+          
+          <div class="flex gap-2">
+            <button onclick="window.civicApp.advanceDrawerProgress('In Progress')" class="btn-glass text-[11px] py-1.5 px-2 flex-1 justify-center hover:border-cyan-400 text-cyan-300">
+              ▶ Mark In Progress
+            </button>
+            <button onclick="window.civicApp.advanceDrawerProgress('Resolved')" class="btn-glass text-[11px] py-1.5 px-2 flex-1 justify-center hover:border-emerald-400 text-emerald-300">
+              ✓ Mark Resolved
+            </button>
+            <button onclick="window.civicApp.flyToCurrentRequest()" class="btn-glass text-[11px] py-1.5 px-2 flex-1 justify-center hover:border-purple-400 text-purple-300">
+              🗺️ Locate on GIS
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Incident Audit Timeline -->
+      <div>
+        <h4 class="font-bold text-xs text-slate-400 uppercase tracking-wider mb-3">Incident Audit Trail</h4>
+        <div class="space-y-1" id="drawer-timeline-list">
+          <!-- Injected dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL: CREATE NEW SERVICE REQUEST WITH REAL-TIME AI NLP SCANNER
+       ========================================================================= -->
+  <div id="modal-new-request" class="modal-overlay">
+    <div class="modal-content p-6 max-w-xl">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded bg-cyan-500/20 text-cyan-400">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-white">Report Municipal Problem / Complaint</h3>
+            <p class="text-[11px] text-slate-400">Instant AI NLP evaluates urgency, detects category, and routes to field crews</p>
+          </div>
+        </div>
+        <button class="modal-close p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Geo-coordinate Pinning Indicator -->
+      <div id="new-req-geo-badge" class="hidden mb-3 p-2.5 rounded-lg bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 text-xs flex items-center justify-between">
+        <div class="flex items-center gap-2 font-mono" id="new-req-geo-coords">
+          📍 Pinned GPS Coordinates
+        </div>
+        <span class="badge badge-cyan text-[10px]">SPATIAL PIN ACTIVE</span>
+      </div>
+
+      <!-- Sample Quick-Fill Presets -->
+      <div class="mb-3 space-y-1.5">
+        <div class="text-[11px] font-semibold text-slate-400">Quick-Fill Example Complaint:</div>
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" onclick="window.civicApp.fillSampleIssue('water')" class="btn-glass text-[11px] py-1 px-2">
+            💧 Water Pipe Burst
+          </button>
+          <button type="button" onclick="window.civicApp.fillSampleIssue('pothole')" class="btn-glass text-[11px] py-1 px-2">
+            🚧 Road Pothole
+          </button>
+          <button type="button" onclick="window.civicApp.fillSampleIssue('drain')" class="btn-glass text-[11px] py-1 px-2">
+            🌧️ Storm Drain
+          </button>
+          <button type="button" onclick="window.civicApp.fillSampleIssue('waste')" class="btn-glass text-[11px] py-1 px-2">
+            🗑️ Garbage Overflow
+          </button>
+          <button type="button" onclick="window.civicApp.fillSampleIssue('light')" class="btn-glass text-[11px] py-1 px-2">
+            💡 Sparking Wire
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Issue Description (Type freely):</label>
+          <textarea id="new-req-desc" rows="3" placeholder="e.g. Water is continuously leaking from main pipe near the market road causing street flooding..." class="w-full bg-slate-900 text-slate-100 p-3 rounded-lg border border-white/10 focus:border-cyan-500 outline-none leading-relaxed"></textarea>
+        </div>
+
+        <!-- Live AI NLP Scanner Feedback Box -->
+        <div class="p-3.5 rounded-lg bg-indigo-950/40 border border-indigo-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="badge badge-ai">REAL-TIME NLP SCANNER</span>
+            <span class="text-[11px] font-mono font-bold text-indigo-300">Priority: <span id="nlp-pred-priority">65/100</span></span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-slate-900/60 p-2 rounded">
+            <div><span class="text-slate-400">Category:</span> <strong class="text-slate-100" id="nlp-pred-category">Water</strong></div>
+            <div><span class="text-slate-400">Severity:</span> <span class="badge badge-high" id="nlp-pred-severity">High</span></div>
+            <div><span class="text-slate-400">Department:</span> <span class="text-slate-200" id="nlp-pred-dept">Water Management</span></div>
+            <div><span class="text-slate-400">Estimated ETA:</span> <strong class="text-cyan-300" id="nlp-pred-eta">4 Hours</strong></div>
+          </div>
+          <p class="text-[11px] text-indigo-200" id="nlp-pred-explanation">
+            NLP will automatically detect intent and urgency tokens upon input.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Zone:</label>
+            <select id="new-req-zone" class="w-full bg-slate-900 text-slate-100 p-2 rounded border border-white/10 outline-none">
+              <option value="Zone 1">Zone 1 - Downtown Core</option>
+              <option value="Zone 2">Zone 2 - Industrial District</option>
+              <option value="Zone 3">Zone 3 - North Suburbs</option>
+              <option value="Zone 4">Zone 4 - West Commercial</option>
+              <option value="Zone 5">Zone 5 - East Riverfront</option>
+              <option value="Zone 6">Zone 6 - South Residential</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Reporter Name:</label>
+            <input type="text" id="new-req-reporter" value="Civil Resident" class="w-full bg-slate-900 text-slate-100 p-2 rounded border border-white/10 outline-none" />
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Reporter Contact:</label>
+            <input type="text" id="new-req-contact" value="+1-555-0199" class="w-full bg-slate-900 text-slate-100 p-2 rounded border border-white/10 outline-none" />
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-3 border-t border-white/10">
+          <button class="modal-close btn-secondary py-2 px-4">Cancel</button>
+          <button onclick="window.civicApp.submitNewRequestForm()" class="btn-primary py-2 px-5 shadow-lg shadow-cyan-500/25">
+            Submit & Triaging Incident →
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL: DEMO SCENARIO SIMULATOR (5 HACKATHON SCENARIOS)
+       ========================================================================= -->
+  <div id="modal-scenarios" class="modal-overlay">
+    <div class="modal-content p-6 max-w-2xl">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded bg-amber-500/20 text-amber-400">
+            <i data-lucide="zap" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-white">Hackathon Demo Scenarios</h3>
+            <p class="text-[11px] text-slate-400">Simulate real-time municipal stresses to demonstrate the full AI decision cycle</p>
+          </div>
+        </div>
+        <button class="modal-close p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <!-- Scenario 1 -->
+        <div class="p-3.5 rounded-lg bg-slate-900/60 border border-white/10 hover:border-cyan-500 flex items-center justify-between gap-4 transition-all">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="badge badge-high text-[10px]">SCENARIO 1</span>
+              <h4 class="font-bold text-slate-100 text-xs">Solid Waste Backlog in Zone 4 (Festival Surge)</h4>
+            </div>
+            <p class="text-xs text-slate-400">Injects 6 high-volume commercial waste requests; triggers AI team reallocation from Zone 6 to Zone 4.</p>
+          </div>
+          <button onclick="window.civicApp.triggerScenario('scenario_1')" class="btn-primary text-xs py-1.5 px-3 whitespace-nowrap">
+            Run Scenario 1
+          </button>
+        </div>
+
+        <!-- Scenario 2 -->
+        <div class="p-3.5 rounded-lg bg-slate-900/60 border border-white/10 hover:border-cyan-500 flex items-center justify-between gap-4 transition-all">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="badge badge-critical text-[10px]">SCENARIO 2</span>
+              <h4 class="font-bold text-slate-100 text-xs">Industrial Main Pipe Rupture in Zone 2</h4>
+            </div>
+            <p class="text-xs text-slate-400">Simulates catastrophic 36-inch water main failure dropping city pressure by 40%.</p>
+          </div>
+          <button onclick="window.civicApp.triggerScenario('scenario_2')" class="btn-danger text-xs py-1.5 px-3 whitespace-nowrap">
+            Run Scenario 2
+          </button>
+        </div>
+
+        <!-- Scenario 3 -->
+        <div class="p-3.5 rounded-lg bg-slate-900/60 border border-white/10 hover:border-cyan-500 flex items-center justify-between gap-4 transition-all">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="badge badge-critical text-[10px]">SCENARIO 3</span>
+              <h4 class="font-bold text-slate-100 text-xs">Flash Monsoon Storm Overloading Drainage in Zone 3</h4>
+            </div>
+            <p class="text-xs text-slate-400">Generates 45mm cloudburst; mobilizes high-flow vacuum tankers and drainage emergency crews.</p>
+          </div>
+          <button onclick="window.civicApp.triggerScenario('scenario_3')" class="btn-primary text-xs py-1.5 px-3 whitespace-nowrap">
+            Run Scenario 3
+          </button>
+        </div>
+
+        <!-- Scenario 4 -->
+        <div class="p-3.5 rounded-lg bg-slate-900/60 border border-white/10 hover:border-cyan-500 flex items-center justify-between gap-4 transition-all">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="badge badge-medium text-[10px]">SCENARIO 4</span>
+              <h4 class="font-bold text-slate-100 text-xs">Field Resource Deficit / Crew Strike</h4>
+            </div>
+            <p class="text-xs text-slate-400">Marks 4 field teams unavailable; AI dynamic rebalancer re-optimizes remaining fleet.</p>
+          </div>
+          <button onclick="window.civicApp.triggerScenario('scenario_4')" class="btn-secondary text-xs py-1.5 px-3 whitespace-nowrap">
+            Run Scenario 4
+          </button>
+        </div>
+
+        <!-- Scenario 5 -->
+        <div class="p-3.5 rounded-lg bg-slate-900/60 border border-white/10 hover:border-cyan-500 flex items-center justify-between gap-4 transition-all">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="badge badge-ai text-[10px]">SCENARIO 5</span>
+              <h4 class="font-bold text-slate-100 text-xs">Citywide 30% Demand Surge</h4>
+            </div>
+            <p class="text-xs text-slate-400">Multi-category peak civic demand tests predictive ML capacity and cross-departmental routing.</p>
+          </div>
+          <button onclick="window.civicApp.triggerScenario('scenario_5')" class="btn-ai text-xs py-1.5 px-3 whitespace-nowrap">
+            Run Scenario 5
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL: AUTH & ROLE LOGIN
+       ========================================================================= -->
+  <div id="modal-auth" class="modal-overlay">
+    <div class="modal-content p-6 max-w-md">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded bg-cyan-500/20 text-cyan-400">
+            <i data-lucide="lock" class="w-5 h-5"></i>
+          </div>
+          <h3 class="font-bold text-base text-white">CivicFlow Portal Authentication</h3>
+        </div>
+        <button class="modal-close p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <p class="text-slate-300">Select quick demo credentials to switch application perspective:</p>
+
+        <div class="p-3 rounded bg-slate-900/80 border border-cyan-500/40 cursor-pointer hover:bg-cyan-950/20" onclick="window.civicApp.switchRole('gov_admin'); window.civicApp.closeAllModals();">
+          <div class="font-bold text-cyan-300 flex items-center justify-between">
+            <span>🛡️ Government Operations Commander</span>
+            <span class="badge badge-ai text-[10px]">Full Access</span>
+          </div>
+          <div class="text-[11px] text-slate-400 mt-1">admin@civicflow.gov • Access to all 12 modules, ML models, dispatching & reports.</div>
+        </div>
+
+        <div class="p-3 rounded bg-slate-900/80 border border-emerald-500/40 cursor-pointer hover:bg-emerald-950/20" onclick="window.civicApp.switchRole('citizen'); window.civicApp.closeAllModals();">
+          <div class="font-bold text-emerald-300 flex items-center justify-between">
+            <span>👤 Civil Resident / Citizen</span>
+            <span class="badge badge-low text-[10px]">Public Portal</span>
+          </div>
+          <div class="text-[11px] text-slate-400 mt-1">citizen@metro.org • Report issues with instant AI triage, track progress & upvote.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-[12000] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- =========================================================================
+       APPLICATION SCRIPTS
+       ========================================================================= -->
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/ai-engine.js"></script>
+  <script src="assets/js/map.js"></script>
+  <script src="assets/js/app.js"></script>
+
+  <script>
+    // Initialize application on DOM ready
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      window.civicApp.init();
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

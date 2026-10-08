@@ -1,0 +1,19 @@
+{
+  "name": "civicflow-ai",
+  "version": "2.4.0",
+  "description": "AI-Powered Urban Service Demand & Resource Allocation Platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "smart-city",
+    "ai-operations",
+    "resource-allocation",
+    "civic-tech",
+    "demand-forecasting"
+  ],
+  "author": "CivicFlow AI Team",
+  "license": "MIT"
+}
